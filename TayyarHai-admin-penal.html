@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Panel | TayyarHai</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+  <style>
+    body { font-family: Arial; padding: 20px; background: #eef2f3; }
+    .container { background: white; padding: 20px; border-radius: 8px; max-width: 1000px; margin: auto; box-shadow: 0 0 10px rgba(0,0,0,0.1); margin-bottom: 30px; }
+    input, select { width: 100%; padding: 8px; margin: 5px 0 15px; }
+    button { padding: 10px 20px; background: #2c3e50; color: white; border: none; cursor: pointer; }
+    button:hover { background: #34495e; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    table, th, td { border: 1px solid #ccc; }
+    th, td { padding: 8px; text-align: left; }
+    h2 { margin-top: 0; }
+  </style>
+</head>
+<body>
+
+<div class="container" id="adminPanel">
+  <h2>Welcome Admin</h2>
+
+  <h3>Add Worker</h3>
+  <input type="email" id="workerEmail" placeholder="Worker Email (login ID)">
+  <input type="password" id="workerPassword" placeholder="Password">
+  <input type="text" id="workerName" placeholder="Worker Name">
+  <select id="workType">
+    <option>Plumber</option>
+    <option>Painter</option>
+    <option>Electrician</option>
+    <option>Carpenter</option>
+    <option>Sound & DJ</option>
+    <option>Mehndi & Makeup</option>
+    <option>Wedding Planner</option>
+    <option>Tent Wala</option>
+    <option>Raj Mistry (Home tour)</option>
+    <option>Helper / Labour</option>
+    <option>Other</option>
+  </select>
+  <input type="text" id="phone" placeholder="Phone Number">
+  <input type="text" id="address" placeholder="Full Address">
+  <input type="text" id="pincode" placeholder="Pincode">
+  <input type="text" id="experience" placeholder="Experience">
+  <button onclick="addWorker()">Add Worker</button>
+
+  <h3>All Workers</h3>
+  <div style="display:flex; gap:10px; align-items:center">
+    <input type="text" id="searchBox" placeholder="Search by Type/Address/Pincode">
+    <button onclick="searchWorkers()">🔍</button>
+    <button onclick="window.open('worker_list.pdf')">📥 Worker PDF</button>
+    <button onclick="window.open('worker_list.csv')">📥 Worker CSV</button>
+  </div>
+  <table id="workerTable">
+    <thead>
+      <tr>
+        <th>Email</th><th>Name</th><th>Type</th><th>Phone</th><th>Address</th><th>Pincode</th><th>Delete</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h3>Invoices</h3>
+  <button onclick="window.open('invoice_list.pdf')">📥 Invoice PDF</button>
+  <button onclick="window.open('invoice_list.csv')">📥 Invoice CSV</button>
+  <table id="invoiceTable">
+    <thead>
+      <tr>
+        <th>Worker</th><th>Customer</th><th>Work</th><th>Total</th><th>Advance</th><th>Due</th><th>Date</th><th>Delete</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h3>Company Charge > 0</h3>
+  <ul id="chargeList"></ul>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyB44oZijD7gBOmgPja1jcoT7wwNdp1IorY",
+    authDomain: "tayyarhai-worker-data.firebaseapp.com",
+    projectId: "tayyarhai-worker-data",
+    storageBucket: "tayyarhai-worker-data.appspot.com",
+    messagingSenderId: "586583807984",
+    appId: "1:586583807984:web:ffad3840703d841a3aef35"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  window.onload = () => {
+    loadWorkers();
+    loadInvoices();
+    loadChargeList();
+  };
+
+  function addWorker() {
+    const email = document.getElementById("workerEmail").value;
+    const password = document.getElementById("workerPassword").value;
+    const data = {
+      name: document.getElementById("workerName").value,
+      type: document.getElementById("workType").value,
+      phone: document.getElementById("phone").value,
+      address: document.getElementById("address").value,
+      pincode: document.getElementById("pincode").value,
+      experience: document.getElementById("experience").value,
+      email: email
+    };
+    if (!email || !password) return alert("Email aur Password zaruri hai.");
+    auth.createUserWithEmailAndPassword(email, password)
+      .then(() => db.collection("workers").doc(email).set(data))
+      .then(() => { alert("Worker added!"); clearWorkerForm(); loadWorkers(); })
+      .catch(err => alert("Error: " + err.message));
+  }
+
+  function clearWorkerForm() {
+    ['workerEmail','workerPassword','workerName','phone','address','pincode','experience'].forEach(id => {
+      document.getElementById(id).value = "";
+    });
+  }
+
+  function loadWorkers() {
+    const tbody = document.querySelector("#workerTable tbody");
+    tbody.innerHTML = "";
+    db.collection("workers").get().then(snap => {
+      snap.forEach(doc => {
+        const d = doc.data();
+        const row = `<tr>
+          <td>${d.email}</td><td>${d.name}</td><td>${d.type}</td><td>${d.phone}</td>
+          <td>${d.address}</td><td>${d.pincode}</td>
+          <td><button onclick="deleteWorker('${d.email}')">❌</button></td>
+        </tr>`;
+        tbody.innerHTML += row;
+      });
+    });
+  }
+
+  function deleteWorker(email) {
+    if (confirm("Delete worker " + email + "?")) {
+      db.collection("workers").doc(email).delete().then(() => {
+        alert("Deleted");
+        loadWorkers();
+      });
+    }
+  }
+
+  function loadInvoices() {
+    const tbody = document.querySelector("#invoiceTable tbody");
+    tbody.innerHTML = "";
+    db.collection("invoices").get().then(snap => {
+      snap.forEach(doc => {
+        const d = doc.data();
+        const due = d.totalAmount - d.advanceAmount;
+        const row = `<tr>
+          <td>${d.worker}</td><td>${d.customerName}</td><td>${d.workName}</td>
+          <td>Rs.${d.totalAmount}</td><td>Rs.${d.advanceAmount}</td><td>Rs.${due}</td>
+          <td>${d.date}</td><td><button onclick="deleteInvoice('${doc.id}')">🗑️</button></td>
+        </tr>`;
+        tbody.innerHTML += row;
+      });
+    });
+  }
+
+  function deleteInvoice(id) {
+    if (confirm("Delete this invoice?")) {
+      db.collection("invoices").doc(id).delete().then(() => {
+        alert("Deleted invoice.");
+        loadInvoices();
+        loadChargeList();
+      });
+    }
+  }
+
+  function loadChargeList() {
+    const charges = {};
+    db.collection("invoices").get().then(snap => {
+      snap.forEach(doc => {
+        const d = doc.data();
+        if (!charges[d.worker]) charges[d.worker] = 0;
+        charges[d.worker] += Number(d.totalAmount || 0);
+      });
+      const ul = document.getElementById("chargeList");
+      ul.innerHTML = "";
+      Object.keys(charges).forEach(worker => {
+        const charge = (charges[worker] * 0.03).toFixed(2);
+        if (charge > 0) {
+          ul.innerHTML += `<li>${worker} - Rs.${charge}</li>`;
+        }
+      });
+    });
+  }
+
+  function searchWorkers() {
+    const val = document.getElementById("searchBox").value.toLowerCase();
+    const rows = document.querySelectorAll("#workerTable tbody tr");
+    rows.forEach(row => {
+      const text = row.innerText.toLowerCase();
+      row.style.display = text.includes(val) ? "" : "none";
+    });
+  }
+</script>
+</body>
+</html>
